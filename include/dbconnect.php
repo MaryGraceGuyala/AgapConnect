@@ -2,7 +2,7 @@
 $host = "localhost";
 $user = "root";
 $password = "";
-$dbname = "agapconnect-teamwistoriatech";
+$dbname = "agap_connect";
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $user, $password);

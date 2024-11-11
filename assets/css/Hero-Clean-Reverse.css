@@ -1,0 +1,12 @@
+.fit-cover {
+  object-fit: cover;
+}
+
+.slides {
+  display: none;
+}
+
+.slides img {
+  min-height: 300px;
+}
+
