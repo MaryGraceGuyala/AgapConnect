@@ -1,3 +1,93 @@
+<?php
+require '../include/dbconnect.php';
+
+function generateApplicationNumber() {
+    return uniqid(true);  
+}
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $members_name = $_POST['members_name'];
+    $members_address = $_POST['members_address'];
+    $members_birthdate = $_POST['members_birthdate'];
+    $members_age = $_POST['members_age'];
+    $members_civil_status = $_POST['members_civil_status'];
+    $members_gender = $_POST['members_gender'];
+    $members_contact_number = $_POST['members_contact_number'];
+    $members_work = $_POST['members_work'];
+    $members_household_income = $_POST['members_household_income'];
+    $contact_name = $_POST['contact_name'];
+    $contact_address = $_POST['contact_address'];
+    $contact_age = $_POST['contact_age'];
+    $contact_phone = $_POST['contact_phone'];
+    $members_beneficiary_name = $_POST['members_beneficiary_name'];
+    $members_beneficiary_age = $_POST['members_beneficiary_age'];
+    $members_beneficiary_address = $_POST['members_beneficiary_address'];
+    $members_beneficiary_relationship = $_POST['members_beneficiary_relationship'];
+    $members_beneficiary_income = $_POST['members_beneficiary_income'];
+
+    $uploadDir = '../uploads/';
+    $fileDirectories = [
+        'members_identity' => 'members_identity/',
+        'proof_of_payment' => 'proof_of_payment/',
+    ];
+
+    $filePaths = [];
+    foreach ($fileDirectories as $inputName => $dir) {
+        if (isset($_FILES[$inputName]) && $_FILES[$inputName]['error'] == UPLOAD_ERR_OK) {
+            $filePath = $uploadDir . $dir . basename($_FILES[$inputName]['name']);
+            if (move_uploaded_file($_FILES[$inputName]['tmp_name'], $filePath)) {
+                $filePaths[$inputName] = $filePath; 
+            } else {
+                echo "Error uploading file: " . $_FILES[$inputName]['name'];
+                exit;
+            }
+        } else {
+            echo "Error with file upload for: " . $inputName;
+            exit;
+        }
+    }
+
+    $application_number = generateApplicationNumber();
+
+    $sql = "INSERT INTO membership_requests (members_name, members_address, members_birthdate, members_age, members_civil_status, members_gender, members_contact_number, members_work, members_household_income, contact_name, contact_address, contact_age, contact_phone, members_beneficiary_name, members_beneficiary_age, members_beneficiary_address, members_beneficiary_relationship, members_beneficiary_income, members_identity_path, proof_of_payment_path, application_number) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+    $stmt = $pdo->prepare($sql);
+
+    if ($stmt->execute([
+        $members_name, 
+        $members_address, 
+        $members_birthdate, 
+        $members_age, 
+        $members_civil_status, 
+        $members_gender, 
+        $members_contact_number, 
+        $members_work, 
+        $members_household_income, 
+        $contact_name, 
+        $contact_address, 
+        $contact_age, 
+        $contact_phone, 
+        $members_beneficiary_name, 
+        $members_beneficiary_age, 
+        $members_beneficiary_address, 
+        $members_beneficiary_relationship, 
+        $members_beneficiary_income, 
+        $filePaths['members_identity'], 
+        $filePaths['proof_of_payment'],
+        $applicationtion_number
+    ])) {
+
+        $notification_sql = "INSERT INTO notifications (message) VALUES (:message)";
+        $notification_stmt = $pdo->prepare($notification_sql);
+        $message = "New membership request from " . $members_name .  " (Application #: $application_number)";
+        $notification_stmt->execute([':message' => $message]);
+    } else {
+        echo "Error submitting application.";
+    }
+}
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -114,7 +204,7 @@
                                                             </div>
                                                             <div class="col-md-4" style="padding: 4px; text-align: left;">
                                                                 <label class="form-label">Birthdate</label>
-                                                                <input class="form-control" type="date" name="members_birthdate" required>
+                                                                <input class="form-control" type="date" name="members_birthdate" required onchange="calculateAge(this)">
                                                             </div>
                                                             <div class="col-md-4" style="padding: 4px; text-align: left;">
                                                                 <label class="form-label">Age</label>
@@ -179,7 +269,6 @@
                                                         </div>
                                                     </div>
                                                     <div class="lists-of-beneficiaries">
-                                                
                                                         <div class="row"  style="color: rgb(0,0,0);font-size: 16px; display: flex;font-family: ABeeZee, sans-serif; text-align:left;">
                                                             <h4>List of Beneficiaries:</h4>
                                                             <div id="beneficiaryContainer">
@@ -190,7 +279,7 @@
                                                                     </div>
                                                                     <div class="col-md-2" style="padding: 4px; text-align: left;">
                                                                         <label class="form-label">Age</label>
-                                                                        <input class="form-control" type="number" name="members_beneficiary_age" min="18" required>
+                                                                        <input class="form-control" type="number" name="members_beneficiary_age" required>
                                                                     </div>
                                                                     <div class="col-md-2" style="padding: 4px; text-align: left;">
                                                                         <label class="form-label">Address</label>
@@ -456,41 +545,52 @@
         }
 
         function addBeneficiary() {
-            const container = document.getElementById('beneficiaryContainer');
-            const newEntry = document.createElement('div');
-            newEntry.className = 'beneficiary-entry';
-            newEntry.innerHTML =`
-            <div class="col-md-2" style="padding: 4px; text-align: left;">
-                <input class="form-control" type="text" name="members_beneficiary_name"  required oninput="toggleDeleteIcon(this)">
-               </div>
-            <div class="col-md-2" style="padding: 4px; text-align: left;">
-                <input class="form-control" type="text" name="members_beneficiary_age"  required min="18" required oninput="toggleDeleteIcon(this)">
-            </div>
-            <div class="col-md-2" style="padding: 4px; text-align: left;">
-                <input class="form-control" type="text" name="members_beneficiary_address"  required oninput="toggleDeleteIcon(this)">
-            </div>
-            <div class="col-md-2" style="padding: 4px; text-align: left;">
-                <input class="form-control" type="text" name="members_beneficiary_relationship" required oninput="toggleDeleteIcon(this)">
-            </div>
-            <div class="col-md-3" style="padding: 4px; text-align: left;">
-                <select class="form-control" type="select" name="members_beneficiary_income" required oninput="toggleDeleteIcon(this)">
-                    <option value="">Please select...</option>
-                    <option value="less5">Less than Php 5,000</option>
-                    <option value="5to10">Php 5,000.00 to Php 10,000.00</option>
-                    <option value="10to20">Php 10,000.00 to Php  20,000.00</option>
-                    <option value="20to50">Php 20,000.00 to Php 50,000.00</option>
-                    <option value="morethan50">More than Php 50,000</option>
-                </select>
-            </div>
-            <div class="del" onclick="removeEntry(this)"><i class="fas fa-trash-alt"></i></div>`
-            ;
-            container.appendChild(newEntry);
-        }
-
+    const container = document.getElementById('beneficiaryContainer');
+    const newEntry = document.createElement('div');
+    newEntry.className = 'beneficiary-entry';
+    newEntry.innerHTML = `
+        <div class="col-md-2" style="padding: 4px; text-align: left;">
+            <input class="form-control" type="text" name="members_beneficiary_name" required oninput="toggleDeleteIcon(this)">
+        </div>
+        <div class="col-md-2" style="padding: 4px; text-align: left;">
+            <input class="form-control" type="number" name="members_beneficiary_age" required min="18" oninput="toggleDeleteIcon(this)">
+        </div>
+        <div class="col-md-2" style="padding: 4px; text-align: left;">
+            <input class="form-control" type="text" name="members_beneficiary_address" required oninput="toggleDeleteIcon(this)">
+        </div>
+        <div class="col-md-2" style="padding: 4px; text-align: left;">
+            <input class="form-control" type="text" name="members_beneficiary_relationship" required oninput="toggleDeleteIcon(this)">
+        </div>
+        <div class="col-md-3" style="padding: 4px; text-align: left;">
+            <select class="form-control" type="select" name="members_beneficiary_income" required oninput="toggleDeleteIcon(this)">
+                <option value="">Please select...</option>
+                <option value="less5">Less than Php 5,000</option>
+                <option value="5to10">Php 5,000.00 to Php 10,000.00</option>
+                <option value="10to20">Php 10,000.00 to Php 20,000.00</option>
+                <option value="20to50">Php 20,000.00 to Php 50,000.00</option>
+                <option value="morethan50">More than Php 50,000</option>
+            </select>
+        </div>
+        <div class="del visible" onclick="removeEntry(this)"><i class="fas fa-trash-alt"></i></div>
+    `;
+    container.appendChild(newEntry);
+}
         function removeEntry(deleteIcon) {
             const entry = deleteIcon.closest('.beneficiary-entry');
             entry.remove();
         }
+        function calculateAge(birthdateInput) {
+    const birthdate = new Date(birthdateInput.value);
+    const today = new Date();
+    let age = today.getFullYear() - birthdate.getFullYear();
+    const monthDifference = today.getMonth() - birthdate.getMonth();
+ 
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthdate.getDate())) {
+        age--;
+    }
+    const ageInput = document.querySelector('input[name="members_age"]');
+    ageInput.value = age;
+}
     </script>
 
 </body>

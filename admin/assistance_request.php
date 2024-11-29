@@ -1,10 +1,25 @@
+<?php
+include '../include/dbconnect.php';
+include '../php/notification.php';
+
+$notifications = []; 
+$notification_count = 0; 
+
+$stmt = $pdo->prepare("SELECT * FROM notifications WHERE status = 'Unread'"); 
+$stmt->execute();
+$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$notification_count = count($notifications);
+
+$query = "SELECT * FROM assistance_applications";
+$result = $pdo->query($query);
+
+?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
-    <title>Admin - Dashboard</title>
+    <title>Assistance Requests</title>
     <link rel="stylesheet" href="assets/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=ABeeZee&amp;display=swap">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Aclonica&amp;display=swap">
@@ -15,7 +30,6 @@
     <link rel="stylesheet" href="assets/css/Navbar-Right-Links.css">
     <link rel="stylesheet" href="assets/css/styles.css">
 </head>
-
 <body class="text-muted small pt-2 ps-1">
     <header class="justify-content-between header fixed-top d-flex align-items-center" id="header" style="padding: 4px;background: url(&quot;assets/img/background.png&quot;) center / cover no-repeat, rgb(255,255,255);">
         <div class="d-flex align-items-center justify-content-between" style="gap: 15px">
@@ -36,15 +50,40 @@
                 <li class="nav-item dropdown" style="margin-top: 15px;">
                     <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" style="margin-right: 10px;">
                         <i class="fas fa-bell fs-3 text-dark"></i>
-                        <span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);">0</span>
+                        <span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);"> 
+                            <?php echo $notification_count > 0 ? $notification_count : '0'; ?>                        
+                        </span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
-                        <li class="dropdown-header">"You don't have new notifications."
-                            <a href="#"><span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a>
-                        </li>
+                    <li class="dropdown-header">
+                        <?php 
+                        if ($notification_count > 0) {
+                            echo "You have $notification_count new notifications.";
+                        } else {
+                        echo "You don't have new notifications.";
+                    }
+                    ?>
+                    <a href="#">
+                        <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
+                    </a>                        
+                </li>
                         <li class="dropdown-divider"></li>
-                        <li class="notification-item"></li>
-                        <li class="notification-item"></li>
+                         
+                        <?php if ($notification_count > 0): ?>
+                        <?php foreach ($notifications as $notification): ?>
+                        <li class="notification-item">
+                            <div>
+                                <h6><?php echo htmlspecialchars($notification['message']); ?></h6>
+                                    <small><?php echo date('Y-m-d H:i:s', strtotime($notification['created_at'])); ?></small>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <li class="notification-item">
+                            <div>No notifications available.</div>
+                        </li>
+                        <?php endif; ?>
+                                
                     </ul>
                 </li>
             </ul>
@@ -92,7 +131,7 @@
                     <span style="padding-left: 5px;">Requests</span>
                     <i class="fas fa-chevron-down ms-auto"></i>
                 </a>
-                <ul id="requests-nav" class="nav-content collapse show">
+                <ul id="requests-nav" class="nav-content collapse">
                     <li class="nav-item">
                         <a href="assistance_request.php">
                             <i class="fas fa-file-contract"></i><span>&nbsp; Assistance Requests</span>
@@ -101,6 +140,11 @@
                     <li class="nav-item">
                         <a href="membership_request.php">
                             <i class="fas fa-file-contract"></i><span>&nbsp; Membership Requests</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="donation_request.php">
+                            <i class="fas fa-file-contract"></i><span>&nbsp; Donation Requests</span>
                         </a>
                     </li>
                 </ul>
@@ -154,9 +198,15 @@
                                 <div class="filter"><a href="#" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-h" style="color: rgb(56,59,62);padding-right: 5px;"></i></a>
                                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
                                         <li class="dropdown-header text-start">Filter</li>
-                                        <li class="dropdown-item"><a href="#" style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">Today</a></li>
-                                        <li class="dropdown-item"><a href="#" style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">This Week</a></li>
-                                        <li class="dropdown-item"><a href="#"  style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">This Month</a></li>
+                                        <li class="dropdown-item">
+                                            <a href="#" style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">Today</a>
+                                        </li>
+                                        <li class="dropdown-item">
+                                            <a href="#" style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">This Week</a>
+                                        </li>
+                                        <li class="dropdown-item">
+                                            <a href="#"  style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">This Month</a>
+                                        </li>
                                     </ul>
                                 </div>
                                 <div class="card-body" style="font-family: ABeeZee, sans-serif;background: #ffffff;border-style: none;border-color: rgb(13,44,72);box-shadow: 0px 0px 4px rgb(31,157,0);border-radius: 4px;">
@@ -300,9 +350,30 @@
                                                             <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Assistance Type</button></th>
                                                             <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Application Date</button></th>
                                                             <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Status</button></th>
+                                                            <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Action</button></th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
+                                                        <?php
+                                                            if ($result->rowCount() > 0) {
+                                                                while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
+                                                                    echo "<tr>
+                                                                            <td>" . htmlspecialchars($row['id']) . "</td>
+                                                                            <td>" . htmlspecialchars($row['fname']) . "</td>
+                                                                            <td>" . htmlspecialchars($row['lname']) . "</td>
+                                                                            <td>" . htmlspecialchars($row['assistance_type']) . "</td>
+                                                                            <td>" . htmlspecialchars($row['created_at']) . "</td>
+                                                                            <td>" . htmlspecialchars($row['status']) . "</td>
+                                                                            <td>
+                                                                                <a href='view-assistance-application.php?id=" . htmlspecialchars($row['id']) . "' class='btn btn-info'>View</a> 
+                                                                                <button class='btn btn-danger'>Delete</button>
+                                                                            </td>
+                                                                        </tr>";
+                                                                }
+                                                            } else {
+                                                                echo "<tr><td colspan='7' class='text-center'>No assistance requests found.</td></tr>";
+                                                            }
+                                                        ?>
                                                     </tbody>
                                                 </table>
                                             </div>

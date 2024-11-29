@@ -1,3 +1,20 @@
+<?php
+include '../include/dbconnect.php';
+include '../php/notification.php';
+
+$notifications = []; 
+$notification_count = 0; 
+
+$stmt = $pdo->prepare("SELECT * FROM notifications WHERE status = 'Unread'"); 
+$stmt->execute();
+$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$notification_count = count($notifications);
+
+$query = "SELECT * FROM membership_requests";
+$result = $pdo->query($query);
+
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -25,12 +42,43 @@
         <nav class="d-flex justify-content-between align-items-lg-center header-nav ms-auto" style="gap: 10px">
             <ul class="d-lg-flex align-items-lg-center d-flex align-items-center" style="gap:10px;">
                 <li class="nav-item d-block d-lg-none"><a class="nav-link nav-icon search-bar-toggle" href="#"><i class="fas fa-search fs-3 text-dark nav-item d-block d-lg-none" style="margin-top: 15px;"></i></a></li>
-                <li class="nav-item dropdown" style="margin-top: 15px;"><a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" style="margin-right: 10px;"><i class="fas fa-bell fs-3 text-dark"></i><span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);">0</span></a>
+                <li class="nav-item dropdown" style="margin-top: 15px;">
+                    <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" style="margin-right: 10px;">
+                        <i class="fas fa-bell fs-3 text-dark"></i>
+                        <span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);"> 
+                            <?php echo $notification_count > 0 ? $notification_count : '0'; ?>                        
+                        </span>
+                    </a>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
-                        <li class="dropdown-header">"You don't have new notifications."<a href="#"><span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a></li>
+                    <li class="dropdown-header">
+                        <?php 
+                        if ($notification_count > 0) {
+                            echo "You have $notification_count new notifications.";
+                        } else {
+                        echo "You don't have new notifications.";
+                    }
+                    ?>
+                    <a href="#">
+                        <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
+                    </a>                        
+                </li>
                         <li class="dropdown-divider"></li>
-                        <li class="notification-item"></li>
-                        <li class="notification-item"></li>
+                         
+                        <?php if ($notification_count > 0): ?>
+                        <?php foreach ($notifications as $notification): ?>
+                        <li class="notification-item">
+                            <div>
+                                <h6><?php echo htmlspecialchars($notification['message']); ?></h6>
+                                    <small><?php echo date('Y-m-d H:i:s', strtotime($notification['created_at'])); ?></small>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <li class="notification-item">
+                            <div>No notifications available.</div>
+                        </li>
+                        <?php endif; ?>
+                                
                     </ul>
                 </li>
             </ul>
@@ -82,6 +130,11 @@
                     <li class="nav-item">
                         <a href="membership_request.php">
                             <i class="fas fa-file-contract"></i><span>&nbsp; Membership Requests</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="donation_request.php">
+                            <i class="fas fa-file-contract"></i><span>&nbsp; Donation Requests</span>
                         </a>
                     </li>
                 </ul>
@@ -150,12 +203,12 @@
                         </div>
                         <div class="col-12">
                             <div class="card info-card visitations-card overflow-auto" style="padding-right: 0px;">
-                                <div class="filter"><a href="#" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-h" style="color: rgb(56,59,62);padding-right: 5px;"></i></a>
+                            <div class="filter"><a href="#" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-h" style="color: rgb(56,59,62);padding-right: 5px;"></i></a>
                                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                                        <li class="dropdown-header text-start">Item 1</li>
-                                        <li class="dropdown-item">Item 2<a href="#">Link</a></li>
-                                        <li class="dropdown-item">Item 2<a href="#">Link</a></li>
-                                        <li class="dropdown-item">Item 2<a href="#">Link</a></li>
+                                        <li class="dropdown-header text-start">Filter</li>
+                                        <li class="dropdown-item"><a href="#">Today</a></li>
+                                        <li class="dropdown-item"><a href="#">This Month</a></li>
+                                        <li class="dropdown-item"><a href="#">This Year</a></li>
                                     </ul>
                                 </div>
                                 <div class="card-body">
@@ -178,11 +231,29 @@
                                                             <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">#</button></th>
                                                             <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Name</button></th>
                                                             <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Application Date</button></th>
+                                                            <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Status</button></th>
                                                             <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Action</button></th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody>
-                                            
+                                                    <tbody class="text-center">
+                                                    <?php
+                                                        if ($result->rowCount() > 0) {
+                                                            while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
+                                                                echo "<tr>
+                                                                        <td>" . htmlspecialchars($row['application_number']) . "</td>
+                                                                        <td>" . htmlspecialchars($row['members_name']) . "</td>
+                                                                        <td>" . htmlspecialchars($row['created_at']) . "</td>
+                                                                        <td>" . htmlspecialchars($row['status']) . "</td>
+                                                                        <td>
+                                                                            <a href='view-membership-application.php?application_number=" . htmlspecialchars($row['application_number']) . "' class='btn btn-info'>View</a> 
+                                                                            <button class='btn btn-danger'>Delete</button>
+                                                                        </td>
+                                                                    </tr>";
+                                                            }
+                                                        } else {
+                                                            echo "<tr><td colspan='5' class='text-center'>No assistance requests found.</td></tr>";
+                                                        }
+                                                        ?>
                                                     </tbody>
                                                         
                 

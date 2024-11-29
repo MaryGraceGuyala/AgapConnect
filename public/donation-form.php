@@ -1,3 +1,75 @@
+<?php
+require '../include/dbconnect.php'; 
+
+function generateTransactionNumber() {
+    return uniqid(true);  
+}
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $donor_first_name = $_POST['donor_first_name'];
+    $donor_middle_name = $_POST['donor_middle_name'];
+    $donor_last_name = $_POST['donor_last_name'];
+    $address = $_POST['address'];
+    $age = $_POST['age'];
+    $sex = $_POST['sex'];
+    $contact_number = $_POST['contact_number'];
+    $donation_type = isset($_POST['donation_type']) ? implode(", ", $_POST['donation_type']) : '';
+    $donation_items = $_POST['donation_items'];
+    $amount = $_POST['amount'];
+    $quantity = $_POST['quantity'];
+
+    $uploads = ['proof_of_donation'];
+    $file_paths = [];
+
+    foreach ($uploads as $upload) {
+        if (isset($_FILES[$upload]) && $_FILES[$upload]['error'] == 0) {
+            $target_dir = "../uploads/";
+            $target_file = $target_dir . basename($_FILES[$upload]["name"]);
+            if (move_uploaded_file($_FILES[$upload]["tmp_name"], $target_file)) {
+                $file_paths[$upload] = $target_file;
+            } else {
+                echo "Sorry, there was an error uploading your file.";
+            }
+        } else {
+            $file_paths[$upload] = null;
+        }
+    }
+
+    $transaction_number = generateTransactionNumber(); 
+
+    $sql = "INSERT INTO donations (donor_first_name, donor_middle_name, donor_last_name, address, age, sex, contact_number, donation_type, donation_items, amount, quantity, proof_of_donation, transaction_number)
+            VALUES (:donor_first_name, :donor_middle_name, :donor_last_name, :address, :age, :sex, :contact_number, :donation_type, :donation_items, :amount, :quantity, :proof_of_donation, :transaction_number)";
+
+    $stmt = $pdo->prepare($sql);
+    if ($stmt->execute([
+        ':donor_first_name'=> $donor_first_name, 
+        ':donor_middle_name'=> $donor_middle_name, 
+        ':donor_last_name'=> $donor_last_name, 
+        ':address'=>$address, 
+        ':age'=> $age, 
+        ':sex'=> $sex, 
+        ':contact_number'=> $contact_number, 
+        ':donation_type'=> $donation_type, 
+        ':donation_items'=> $donation_items, 
+        ':amount'=> $amount, 
+        ':quantity'=> $quantity,
+        ':proof_of_donation'=> $file_paths['proof_of_donation'],
+        ':transaction_number'=> $transaction_number
+    ])) { 
+        
+        $notification_sql = "INSERT INTO notifications (message) VALUES (:message)";
+        $notification_stmt = $pdo->prepare($notification_sql);
+        $message = "New donation received from " . $donor_first_name . " " . $donor_last_name . " (Transaction #: $transaction_number)";
+        $notification_stmt->execute([':message' => $message]);
+
+        
+        header ('Location: donation_history.php?donor_first_name=' . urlencode($donor_first_name));
+    } else {
+        echo "Error submitting donation.";
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -13,6 +85,43 @@
     <link rel="stylesheet" href="assets/css/Hero-Clean-Reverse.css">
     <link rel="stylesheet" href="assets/css/Navbar-Right-Links.css">
     <link rel="stylesheet" href="assets/css/styles.css">
+    <script>
+        function toggleFields() {
+    const cashChecked = document.querySelector('input[name="donation_type[]"][value="cash"]').checked;
+    const healthcareChecked = document.querySelector('input[name="donation_type[]"][value="healthcare"]').checked;
+    const suppliesChecked = document.querySelector('input[name="donation_type[]"][value="supplies"]').checked;
+
+    const amountField = document.querySelector('input[name="amount"]');
+    const quantityField = document.querySelector('input[name="quantity"]');
+
+   
+    if (cashChecked && healthcareChecked && suppliesChecked) {
+        amountField.disabled = false;
+        quantityField.disabled = false;
+    }
+    if (cashChecked && healthcareChecked || cashChecked && suppliesChecked) {
+        amountField.disabled = false;
+        quantityField.disabled = false;
+    }
+    else if (cashChecked) {
+        amountField.disabled = false;
+        quantityField.disabled = true;
+        quantityField.value = ''; 
+    }
+    
+    else if (healthcareChecked || suppliesChecked) {
+        quantityField.disabled = false;
+        amountField.disabled = true;
+        amountField.value = ''; 
+    }
+    else {
+        amountField.disabled = true;
+        quantityField.disabled = true;
+        amountField.value = '';
+        quantityField.value = '';
+    }
+}
+    </script>
 </head>
 
 <body class="index-page" data-aos-easing="ease-in-out" data-aos-duration="600" data-aos-delay="0">
@@ -93,27 +202,21 @@
                                     <label class="form-label">Contact Number</label>
                                     <input class="form-control" type="text" name="contact_number" maxLength=11 required>
                                 </div>
-                                <div class="col-md-12" style="padding: 4px; text-align: center;">
-                                    <button type="button" class="btn btn-primary" style="background: rgb(5,108,34);width: 113.9px;height: 42px;font-size: 19px;border-style: none;" onclick="nextStep()">Next</button>
-                                </div>
-                            </form>
-
-                            <form class="row" method="POST" action="donation-form.php" enctype="multipart/form-data" style="padding: 12px; display: none;" id="donation-type-form">
                                 <div class="col-md-12" style="padding: 4px;">
                                     <h2>Donation Type</h2>
                                 </div>
                                 <div class="col-md-12" style="padding: 4px;">
                                     <label class="form-label">Type of Donation:</label>
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="donation_type[]" value="healthcare">
+                                        <input class="form-check-input" type="checkbox" name="donation_type[]" value="healthcare" onchange="toggleFields()">
                                         <label class="form-check-label">Healthcare</label>
                                     </div>
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="donation_type[]" value="cash">
+                                        <input class="form-check-input" type="checkbox" name="donation_type[]" value="cash" onchange="toggleFields()">
                                         <label class="form-check-label">Cash</label>
                                     </div>
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="donation_type[]" value="supplies">
+                                        <input class="form-check-input" type="checkbox" name="donation_type[]" value="supplies" onchange="toggleFields()">
                                         <label class="form-check-label">Supplies</label>
                                     </div>
                                 </div>
@@ -121,13 +224,6 @@
                                     <label class="form-label">Donation Items:</label>
                                     <input class="form-control" type="text" name="donation_items" required>
                                 </div>
-                                <div class="col-md-12 text-center d-flex justify-content-evenly" style="padding: 4px; text-align: center;">
-                                    <button type="button" class="btn btn-primary" style="background: rgb(0,64,26);font-size: 19px;height: 42px;width: 113.9px;border-style: none;" onclick="previousStep()">Previous</button>
-                                    <button type="button" class="btn btn-primary" style="background: rgb(5,108,34);width: 113.9px;height: 42px;font-size: 19px;border-style: none;" onclick="nextStep()">Next</button>
-                                </div>
-                            </form>
-
-                            <form class="row" method="POST" action="donation-form.php" enctype="multipart/form-data" style="padding: 12px; display: none;" id="donation-payment-form">
                                 <div class="col-md-12" style="padding: 4px;">
                                     <h4>Donation Payment</h4>
                                 </div>
@@ -138,7 +234,7 @@
                                         <img class="d-md-flex" src="assets/img/scantopay.jpeg" style="width: 250px;height: 250px;" /></div>
                                     <div>
                                         <label class="form-label" style="font-size: 19px;">Amount</label>
-                                        <input class="form-control" type="text" style="font-size: 19px;" name="amount">
+                                        <input class="form-control" type="text" style="font-size: 19px;" name="amount" disabled>
                                     </div>
                                     <div>
                                         <span style="font-size: 19px;">
@@ -146,7 +242,7 @@
                                             <br/>
                                         </span>
                                         <label class="form-label" style="font-size: 19px;">Quantity</label>
-                                        <input class="form-control" type="number" style="font-size: 19px;" name="Quantity">
+                                        <input class="form-control" type="number" style="font-size: 19px;" name="quantity" disabled>
                                     </div>
                                     <div>
                                         <label class="form-label" style="font-size: 19px;">Proof of Donation</label>
@@ -154,37 +250,18 @@
                                     </div>
                                 </div> 
                                 <div class="col-md-12 text-center d-flex justify-content-evenly" style="padding: 4px; text-align: center;">
-                                    <button type="button" class="btn btn-primary" style="background: rgb(0,64,26);font-size: 19px;height: 42px;width: 113.9px;border-style: none;" onclick="previousStep()">Previous</button>
                                     <button type="submit" class="btn btn-primary" style="background: rgb(5,108,34);font-size: 19px;height: 42px;width: 113.9px;border-style: none;">Submit</button>
                                 </div>
                             </form>
-                         </div>
+                        </div>
                         
                     </div>
-                </div>
-
-                    
-                       
+                </div>          
             </div>
         </div>
     </section>
 </main>
 
-        <script>
-            let currentForm = 0;
-            let forms = document.querySelectorAll('form');
-
-            function nextStep() {
-                forms[currentForm].style.display = 'none';
-                currentForm++;
-                forms[currentForm].style.display = 'block';
-            }
-
-            function previousStep() {
-                forms[currentForm].style.display = 'none';
-                currentForm--;
-                forms[currentForm].style.display = 'block';
-            }
-        </script>
 </body>
 </html>
+

@@ -1,7 +1,8 @@
 <?php
-require '../include/dbconnect.php';
+include '../include/dbconnect.php';
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+
     $assistance_type = $_POST['assistance_type'];
     $fname = $_POST['fname'];
     $mname = $_POST['mname'];
@@ -21,77 +22,61 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $representative_relationship = $_POST['representative_relationship'];
     $representative_contact_number = $_POST['representative_contact_number'];
 
- 
-    $sql = "INSERT INTO assistance_applications (assistance_type, fname, mname, lname, birthdate, age, address, sex, civil_status, contact_number, household_income, medical_diagnosis, patient_type, hospital, representative_name, representative_age, representative_relationship, representative_contact_number) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    
-    $stmt = $pdo->prepare($sql);
 
+    $uploads = ['barangay_certificate_of_indigency', 'valid_id', 'medical_abstract', 'prescription', 'lab_requests', 'death_certificate', 'funeral_contract', 'funeral_balance'];
+    $file_paths = [];
 
-    if ($stmt->execute([$assistance_type, $fname, $mname, $lname, $birthdate, $age, $address, $sex, $civil_status, $contact_number, $household_income, $medical_diagnosis, $patient_type, $hospital, $representative_name, $representative_age, $representative_relationship, $representative_contact_number])) {
-
-        $applicationId = $pdo->lastInsertId();
-
-        $uploadDir = 'uploads/';
-    
-    
-    $fileDirectories = [
-        'barangay_certificate_of_indigency' => 'barangay_certificate/',
-        'valid_id' => 'valid_id/',
-        'medical_abstract' => 'medical_abstract/',
-        'prescription' => 'prescription/',
-        'lab_requests' => 'lab_requests/',
-        'death_certificate' => 'death_certificate/',
-        'funeral_contract' => 'funeral_contract/',
-        'funeral_balance' => 'funeral_balance/',
-    ];
-
-    foreach ($fileDirectories as $dir) {
-        if (!is_dir($uploadDir . $dir)) {
-            mkdir($uploadDir . $dir, 0777, true);
-        }
-    }
-
-    foreach ($fileDirectories as $inputName => $dir) {
-        if (isset($_FILES[$inputName]) && $_FILES[$inputName]['error'] == UPLOAD_ERR_OK) {
-            $filePath = $uploadDir . $dir . basename($_FILES[$inputName]['name']);
-            if (move_uploaded_file($_FILES[$inputName]['tmp_name'], $filePath)) {
-                echo "Uploaded $inputName successfully to $filePath.<br>";
+    foreach ($uploads as $upload) {
+        if (isset($_FILES[$upload]) && $_FILES[$upload]['error'] == 0) {
+            $target_dir = "../uploads/";
+            $target_file = $target_dir . basename($_FILES[$upload]["name"]);
+            if (move_uploaded_file($_FILES[$upload]["tmp_name"], $target_file)) {
+                $file_paths[$upload] = $target_file;
             } else {
-                echo "Failed to upload $inputName.<br>";
+                echo "Sorry, there was an error uploading your file.";
             }
         } else {
-            if (isset($_FILES[$inputName])) {
-                echo "Error uploading $inputName: " . $_FILES[$inputName]['error'] . "<br>";
-            }
+            $file_paths[$upload] = null;
         }
     }
-    
 
-        sendSmsNotification($contact_number, "Your application has been received. Your application ID is: $applicationId");
 
-        echo "Application submitted successfully!";
-    } else {
-        echo "Error submitting application.";
-    }
+    $sql = "INSERT INTO assistance_applications (assistance_type, fname, mname, lname, birthdate, age, address, sex, civil_status, contact_number, household_income, medical_diagnosis, patient_type, hospital, representative_name, representative_age, representative_relationship, representative_contact_number, barangay_certificate_of_indigency, valid_id, medical_abstract, prescription, lab_requests, death_certificate, funeral_contract, funeral_balance) 
+            VALUES (:assistance_type, :fname, :mname, :lname, :birthdate, :age, :address, :sex, :civil_status, :contact_number, :household_income, :medical_diagnosis, :patient_type, :hospital, :representative_name, :representative_age, :representative_relationship, :representative_contact_number, :barangay_certificate_of_indigency, :valid_id, :medical_abstract, :prescription, :lab_requests, :death_certificate, :funeral_contract, :funeral_balance)";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':assistance_type' => $assistance_type,
+        ':fname' => $fname,
+        ':mname' => $mname,
+        ':lname' => $lname,
+        ':birthdate' => $birthdate,
+        ':age' => $age,
+        ':address' => $address,
+        ':sex' => $sex,
+        ':civil_status' => $civil_status,
+        ':contact_number' => $contact_number,
+        ':household_income' => $household_income,
+        ':medical_diagnosis' => $medical_diagnosis,
+        ':patient_type' => $patient_type,
+        ':hospital' => $hospital,
+        ':representative_name' => $representative_name,
+        ':representative_age' => $representative_age,
+        ':representative_relationship' => $representative_relationship,
+        ':representative_contact_number' => $representative_contact_number,
+        ':barangay_certificate_of_indigency' => $file_paths['barangay_certificate_of_indigency'],
+        ':valid_id' => $file_paths['valid_id'],
+        ':medical_abstract' => $file_paths['medical_abstract'],
+        ':prescription' => $file_paths['prescription'],
+        ':lab_requests' => $file_paths['lab_requests'],
+        ':death_certificate' => $file_paths['death_certificate'],
+        ':funeral_contract' => $file_paths['funeral_contract'],
+        ':funeral_balance' => $file_paths['funeral_balance']
+    ]);
+
+    echo "Application submitted successfully!";
 }
 
-function sendSmsNotification($phoneNumber, $message) {
-
-    $url = "http://";
-    $data = [
-        'to' => $phoneNumber,
-        'message' => $message,
-    ];
-
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-    $response = curl_exec($ch);
-    curl_close($ch );
-
-    return $response;
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -109,6 +94,7 @@ function sendSmsNotification($phoneNumber, $message) {
     <link rel="stylesheet" href="assets/css/Hero-Clean-Reverse.css">
     <link rel="stylesheet" href="assets/css/Navbar-Right-Links.css">
     <link rel="stylesheet" href="assets/css/styles.css">
+    
 </head>
 
 <body class="text-muted small pt-2 ps-1">
@@ -191,11 +177,11 @@ function sendSmsNotification($phoneNumber, $message) {
             <div class="col-md-8">
                 <div class="card" style="box-shadow: 0px 0px 5px rgb(80,152,62);">
                     <div class="card-body" style="color: rgb(0,0,0);font-size: 16px;font-family: ABeeZee, sans-serif;">
-                        <form method="POST" action="assistance_application.php" class="assistance-application-form" style="padding: 3px;">
+                        <form method="POST" action="assistance_application.php" enctype="multipart/form-data"  class="assistance-application-form" style="padding: 3px;">
                             <div id="step1" class="d-flex row mb-3 step-content active">
                                 <div class="col-md-12">
                                     <label class="form-label col-md-12 col-form-label" style="color: rgb(0,0,0);font-family: Acme, sans-serif;font-size: 16px;text-align: justify;">Choose type of Assistance:</label>
-                                    <select id="assistance-type" name="assistance_type" class="form-select" style="font-family: ABeeZee, sans-serif;" onchange="showMedicalFields()">
+                                    <select id="assistance-type" name="assistance_type" class="form-select" style="font-family: ABeeZee, sans-serif;" onchange="showFields()">
                                         <option value selected>Please select here...</option>
                                         <option value="Financial Assistance">Financial Assistance</option>
                                         <option value="Medical Assistance">Medical Assistance</option>
@@ -222,11 +208,11 @@ function sendSmsNotification($phoneNumber, $message) {
                                 </div>
                                 <div class="col-md-4" style="padding: 4px;">
                                     <label class="form-label">Birthdate</label>
-                                    <input class="form-control" type="text" name="birthdate" required>
+                                    <input class="form-control" type="date" name="birthdate" required onchange="calculateAge(this)">
                                 </div>
                                 <div class="col-md-4" style="padding: 4px;">
                                     <label class="form-label">Age</label>
-                                    <input class="form-control" type="text" name="age" required>
+                                    <input class="form-control" type="number" min=11 name="age" required>
                                 </div>
                                 <div class="col-md-4" style="padding: 4px;">
                                     <label class="form-label">Address</label>
@@ -264,7 +250,7 @@ function sendSmsNotification($phoneNumber, $message) {
                                             <option value="More than Php 50,000.00">More than Php 50,000.00</option>
                                         </select>
                                     </div>
-                                    <div id="medical-fields" class="row mb-3" style="margin-top: 10px;padding-top: 12px;">
+                                    <div id="medical-fields" class="row mb-3" style="display: none; margin-top: 10px; padding-top: 12px;">
                                         <h5 style="text-align: justify;font-size: 16px;color: rgb(51,49,49);">This should be filled up if the type of assistance chosen is Medical Assistance</h5>
                                         <div class="col-md-4" style="padding: 4px;">
                                             <label class="form-label">Complete Diagnosis&nbsp;</label>
@@ -317,7 +303,7 @@ function sendSmsNotification($phoneNumber, $message) {
                                             <input class="form-control" type="file" name="valid_id">
                                         </div>
                                     </div>
-                                    <div class="row mb-3">
+                                    <div id="medical-fields" class="row mb-3" style="display: none; margin-top: 10px; padding-top: 12px;">
                                         <h5>Requirements for Medical Assistance</h5>
                                         <div class="col-md-6" style="padding: 4px;">
                                             <label class="form-label">Medical Abstract/Certificate</label>
@@ -332,7 +318,7 @@ function sendSmsNotification($phoneNumber, $message) {
                                             <input class="form-control" type="file" name="lab_requests">
                                         </div>
                                     </div>
-                                    <div class="row mb-3">
+                                    <div id="burial-fields" class="row mb-3" style="display: none; margin-top: 10px; padding-top: 12px;">
                                         <h5>Requirements for Burial Assistance</h5>
                                         <div class="col-md-6" style="padding: 4px;">
                                             <label class="form-label">Death Certificate</label>
@@ -364,6 +350,33 @@ function sendSmsNotification($phoneNumber, $message) {
     <script src="assets/js/main.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
+        function showFields() {
+            const assistanceType = document.getElementById('assistance-type').value;
+            
+            const medicalFields = document.getElementById('medical-fields');
+            const burialFields = document.getElementById('burial-fields');
+            
+            medicalFields.style.display = 'none';
+            burialFields.style.display = 'none';
+            
+            if (assistanceType === 'Medical Assistance') {
+                medicalFields.style.display = 'block';
+            } else if (assistanceType === 'Burial Assistance') {
+                burialFields.style.display = 'block';
+            }
+        }
+        function calculateAge(birthdateInput) {
+            const birthdate = new Date(birthdateInput.value);
+            const today = new Date();
+            let age = today.getFullYear() - birthdate.getFullYear();
+            const monthDifference = today.getMonth() - birthdate.getMonth();
+        
+            if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthdate.getDate())) {
+                age--;
+            }
+            const ageInput = document.querySelector('input[name="age"]');
+            ageInput.value = age;
+        }
         const apiKey = '8bb365f57af94dabaf9249fec01bc3c6';
         const url = 'https://api.geoapify.com/v1/geocode/autocomplete?text=863&type=postcode&filter=countrycode:de&format=json&limit=20&apiKey=' + apiKey;
 

@@ -1,3 +1,18 @@
+<?php
+include '../include/dbconnect.php';
+include '../php/notification.php';
+
+$notifications = []; 
+$notification_count = 0; 
+
+$stmt = $pdo->prepare("SELECT * FROM notifications WHERE status = 'Unread'"); 
+$stmt->execute();
+$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$notification_count = count($notifications);
+
+
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -36,15 +51,40 @@
                 <li class="nav-item dropdown" style="margin-top: 15px;">
                     <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" style="margin-right: 10px;">
                         <i class="fas fa-bell fs-3 text-dark"></i>
-                        <span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);">0</span>
+                        <span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);"> 
+                            <?php echo $notification_count > 0 ? $notification_count : '0'; ?>                        
+                        </span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
-                        <li class="dropdown-header">"You don't have new notifications."
-                            <a href="#"><span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a>
-                        </li>
+                    <li class="dropdown-header">
+                        <?php 
+                        if ($notification_count > 0) {
+                            echo "You have $notification_count new notifications.";
+                        } else {
+                        echo "You don't have new notifications.";
+                    }
+                    ?>
+                    <a href="#">
+                        <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
+                    </a>                        
+                </li>
                         <li class="dropdown-divider"></li>
-                        <li class="notification-item"></li>
-                        <li class="notification-item"></li>
+                         
+                        <?php if ($notification_count > 0): ?>
+                        <?php foreach ($notifications as $notification): ?>
+                        <li class="notification-item">
+                            <div>
+                                <h6><?php echo htmlspecialchars($notification['message']); ?></h6>
+                                    <small><?php echo date('Y-m-d H:i:s', strtotime($notification['created_at'])); ?></small>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <li class="notification-item">
+                            <div>No notifications available.</div>
+                        </li>
+                        <?php endif; ?>
+                                
                     </ul>
                 </li>
             </ul>
@@ -92,7 +132,7 @@
                     <span style="padding-left: 5px;">Requests</span>
                     <i class="fas fa-chevron-down ms-auto"></i>
                 </a>
-                <ul id="requests-nav" class="nav-content collapse show">
+                <ul id="requests-nav" class="nav-content collapse">
                     <li class="nav-item">
                         <a href="assistance_request.php">
                             <i class="fas fa-file-contract"></i><span>&nbsp; Assistance Requests</span>
@@ -101,6 +141,11 @@
                     <li class="nav-item">
                         <a href="membership_request.php">
                             <i class="fas fa-file-contract"></i><span>&nbsp; Membership Requests</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="donation_request.php">
+                            <i class="fas fa-file-contract"></i><span>&nbsp; Donation Requests</span>
                         </a>
                     </li>
                 </ul>
@@ -136,15 +181,13 @@
                                     </ul>
                                 </div>
                                 <div class="card-body" style="font-family: ABeeZee, sans-serif;">
-                                    <h6>Families Assisted<span>&nbsp;| This Month</span></h6>
+                                    <h6>Beneficiaries<span>&nbsp;| This Month</span></h6>
                                     <div class="d-flex align-items-center" style="padding: 5px;">
                                         <div class="card-icon rounded-circle d-flex align-items-center justify-content-center">
                                             <i class="fas fa-users fs-3"></i>
                                         </div>
                                         <div class="ps-3">
-                                            <h3>126</h3>
-                                            <span class="small pt-1 fw-bold">3%</span>
-                                            <span class="text-muted small pt-2 ps-1">&nbsp;decrease</span>
+                                            <h3></h3>
                                         </div>
                                     </div>
                                 </div>
@@ -168,8 +211,6 @@
                                         </div>
                                         <div class="ps-3">
                                             <h3 id="member-count"></h3>
-                                            <span class="small pt-1 fw-bold">25%</span>
-                                            <span class="text-muted small pt-2 ps-1">&nbsp;increase</span>
                                         </div>
                                     </div>
                                 </div>
@@ -177,20 +218,29 @@
                         </div>
                         <div class="col-xxl-4 col-md-6">
                             <div class="card info-card donations-card" style="padding-right: 0px;">
-                                <div class="filter"><a href="#" data-bs-toggle="dropdown"><i class="fas fa-ellipsis-h" style="color: rgb(56,59,62);padding-right: 5px;"></i></a>
+                                <div class="filter">
+                                    <a href="#" data-bs-toggle="dropdown">
+                                        <i class="fas fa-ellipsis-h" style="color: rgb(56,59,62);padding-right: 5px;"></i>
+                                    </a>
                                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-                                        <li class="dropdown-header text-start">Filter</li>
-                                        <li class="dropdown-item"><a href="#"  style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">Today</a></li>
-                                        <li class="dropdown-item"><a href="#"  style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">This Week</a></li>
-                                        <li class="dropdown-item"><a href="#"  style="text-decoration:none; color: black; font-family: Rubik,sans-serif;">This Month</a></li>
+                                        <li class="dropdown-header text-start">Filter by Month</li>
+                                        <li class="dropdown-item">
+                                            <a href="#" style="text-decoration:none; color: black; font-family: Rubik,sans-serif;" onclick="filterDonations('current')">Current Month</a>
+                                        </li>
+                                        <li class="dropdown-item">
+                                            <a href="#" style="text-decoration:none; color: black; font-family: Rubik,sans-serif;" onclick="filterDonations('last')">Last Month</a>
+                                        </li>
+                                        <li class="dropdown-item">
+                                            <a href="#" style="text-decoration:none; color: black; font-family: Rubik,sans-serif;" onclick="filterDonations('custom')">Custom Range</a>
+                                        </li>
                                     </ul>
                                 </div>
                                 <div class="card-body" style="font-family: ABeeZee, sans-serif;">
-                                    <h6>Donations<span>&nbsp;| This Month</span></h6>
+                                    <h6>Donations<span>&nbsp;| <span id="time-frame">This Month</span></span></h6>
                                     <div class="d-flex align-items-center" style="padding: 5px;">
                                         <div class="card-icon rounded-circle d-flex align-items-center justify-content-center" style="background: rgba(201,206,224,0.45);color: rgb(95,105,7);"><i class="fas fa-donate fs-3"></i></div>
                                         <div class="ps-3">
-                                            <h3>Php. 5,000</h3><span class="small pt-1 fw-bold">36%</span><span class="text-muted small pt-2 ps-1">&nbsp;increase</span>
+                                            <h3 id="total-amount"> </h3>
                                         </div>
                                     </div>
                                 </div>
@@ -254,21 +304,6 @@
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                    <?php
-                                                    if ($result->num_rows > 0) {
-                                                     
-                                                        while($row = $result->fetch_assoc()) {
-                                                            echo "<tr style='text-align: center;'>";
-                                                            echo "<td>{$row['visitation_date']}</td>";
-                                                            echo "<td>{$row['visitation_time']}</td>";
-                                                            echo "<td>{$row['visitation_address']}</td>";
-                                                            echo "<td>{$row['visitation_purpose']}</td>";
-                                                            echo "<td>{$row['visitation_status']}</td>";
-                                                        }
-                                                    } else {
-                                                        echo "<tr><td colspan='13' style=' text-align: center;'>No records found.</td></tr>";
-                                                    }
-                                                    ?>
                                                     </tbody>
                                                 </table>
                                             </div>

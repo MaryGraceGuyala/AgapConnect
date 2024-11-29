@@ -1,4 +1,44 @@
+<?php
+include '../include/dbconnect.php';
+include '../php/notification.php';
 
+$notifications = []; 
+$notification_count = 0; 
+
+$stmt = $pdo->prepare("SELECT * FROM notifications WHERE status = 'Unread'"); 
+$stmt->execute();
+$notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$notification_count = count($notifications);
+
+$query = "SELECT * FROM membership_requests WHERE status = 'accepted'";
+$stmt = $pdo->prepare($query);
+$stmt->execute();
+$acceptedMembers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$limit = 5; 
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$page = max($page, 1);
+$offset = ($page - 1) * $limit;
+
+try {
+    $totalRecordsQuery = "SELECT COUNT(*) FROM membership_requests"; 
+    $stmt = $pdo->prepare($totalRecordsQuery);
+    $stmt->execute();
+    $totalRecords = $stmt->fetchColumn();
+    $totalPages = ceil($totalRecords / $limit);
+
+   
+    $membersQuery = "SELECT * FROM membership_requests LIMIT :limit OFFSET :offset"; 
+    $stmt = $pdo->prepare($membersQuery);
+    $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+    $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    echo "Error: " . $e->getMessage();
+}
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -13,6 +53,30 @@
     <link rel="stylesheet" href="../assets/fonts/fontawesome-all.min.css">
     <link rel="stylesheet" href="../assets/css/Navbar-Right-Links.css">
     <link rel="stylesheet" href="../assets/css/styles.css">
+    <style>
+        .pagination {
+    display: inline-block;
+    }
+
+    .pagination a {
+        padding: 8px 16px;
+        margin: 0 4px;
+        text-decoration: none;
+        color: black;
+        border: 1px solid #ddd;
+    }
+
+    .pagination a.active {
+        background-color: #4CAF50;
+        color: white;
+        border: 1px solid #4CAF50;
+    }
+
+    .pagination a:hover:not(.active) {
+        background-color: #ddd;
+    }
+    </style>
+
 </head>
 
 <body class="text-muted small pt-2 ps-1">
@@ -36,14 +100,43 @@
                         <i class="fas fa-search fs-3 text-dark nav-item d-block d-lg-none" style="margin-top: 15px;"></i>
                     </a>
                 </li>
-                <li class="nav-item dropdown" style="margin-top: 15px;"><a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" style="margin-right: 10px;"><i class="fas fa-bell fs-3 text-dark"></i><span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);">0</span></a>
+                <li class="nav-item dropdown" style="margin-top: 15px;">
+                    <a class="nav-link nav-icon" href="#" data-bs-toggle="dropdown" style="margin-right: 10px;">
+                        <i class="fas fa-bell fs-3 text-dark"></i>
+                        <span class="badge badge-number" style="background: rgb(118,217,94);color: rgb(0,0,0);"> 
+                            <?php echo $notification_count > 0 ? $notification_count : '0'; ?>                        
+                        </span>
+                    </a>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-arrow notifications">
-                        <li class="dropdown-header">"You don't have new notifications."<a href="#">
-                            <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span></a>
-                        </li>
+                    <li class="dropdown-header">
+                        <?php 
+                        if ($notification_count > 0) {
+                            echo "You have $notification_count new notifications.";
+                        } else {
+                        echo "You don't have new notifications.";
+                    }
+                    ?>
+                    <a href="#">
+                        <span class="badge rounded-pill bg-primary p-2 ms-2">View all</span>
+                    </a>                        
+                </li>
                         <li class="dropdown-divider"></li>
-                        <li class="notification-item"></li>
-                        <li class="notification-item"></li>
+                         
+                        <?php if ($notification_count > 0): ?>
+                        <?php foreach ($notifications as $notification): ?>
+                        <li class="notification-item">
+                            <div>
+                                <h6><?php echo htmlspecialchars($notification['message']); ?></h6>
+                                    <small><?php echo date('Y-m-d H:i:s', strtotime($notification['created_at'])); ?></small>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <li class="notification-item">
+                            <div>No notifications available.</div>
+                        </li>
+                        <?php endif; ?>
+                                
                     </ul>
                 </li>
             </ul>
@@ -86,7 +179,7 @@
                     <span style="padding-left: 5px;">Requests</span>
                     <i class="fas fa-chevron-down ms-auto"></i>
                 </a>
-                <ul id="requests-nav" class="nav-content collapse show">
+                <ul id="requests-nav" class="nav-content collapse">
                     <li class="nav-item">
                         <a href="assistance_request.php">
                             <i class="fas fa-file-contract"></i><span>&nbsp; Assistance Requests</span>
@@ -95,6 +188,11 @@
                     <li class="nav-item">
                         <a href="membership_request.php">
                             <i class="fas fa-file-contract"></i><span>&nbsp; Membership Requests</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="donation_request.php">
+                            <i class="fas fa-file-contract"></i><span>&nbsp; Donation Requests</span>
                         </a>
                     </li>
                 </ul>
@@ -123,12 +221,6 @@
                             <h4>Members Informations</h4>
                             <div class="datatable-wrapper datatable-loading no-footer sortable searchable fixed-columns">
                                 <div class="datatable-top" style="font-family: ABeeZee, sans-serif;">
-                                    <div class="datatable-dropdown" style="padding: 2px;"><label class="form-label"><select class="datatable-selector">
-                                                <option value="5" selected="">5</option>
-                                                <option value="10">10</option>
-                                                <option value="15">15</option>
-                                                <option value="all">All</option>
-                                            </select>&nbsp;entries per page</label></div>
                                     <div class="datatable-search" style="padding: 2px;"><input type="search" class="datatable-input" placeholder="Search..." name="search" title="Search within the table" style="padding: 2px;"></div>
                                 </div>
                             </div>
@@ -137,33 +229,57 @@
                                     <table class="table">
                                         <thead>
                                             <tr class="text-center" style="border-style: none;background: rgb(211,227,201);font-family: ABeeZee, sans-serif;">
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">ID</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Name</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Address</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Birthdate</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Age</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Sex</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Civil Status</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Contact Number</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Work</button></th>
-                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);"><button class="btn btn-primary datatable-sorter" type="button">Monthly Household Income</button></th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">ID</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Name</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Address</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Birthdate</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Age</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Sex</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Civil Status</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Contact Number</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Work</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Monthly Household Income</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Emergency Contact Person Name</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Emergency Contact Person Address</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Emergency Contact Person Age</th>
+                                                <th class="datatable-descending" data-sortable="true" scope="col" aria-sort="descending" style="border-style: none;background: rgba(255,255,255,0);">Emergency Contact Phone Number</th>
+                                                
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_id']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_name']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_address']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_birthdate']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_age']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_civil_status']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_gender']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_contact_number']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_work']); ?></td>
-                                                <td style="border-style: none;font-family: Acme, sans-serif;"><?php echo htmlspecialchars($memberDetails['members_household_income']); ?></td>
-                                            </tr>
+                                            <?php foreach ($acceptedMembers as $member): ?>
+                                                <tr class="text-center">
+                                                    <td><?php echo htmlspecialchars($member['application_number']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_address']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_birthdate']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_age']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_gender']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_civil_status']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_contact_number']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_work']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['members_household_income']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['contact_name']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['contact_address']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['contact_age']); ?></td>
+                                                    <td><?php echo htmlspecialchars($member['contact_phone']); ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>                          
                                         </tbody>
                                     </table>
+                                </div>
+                                <div class="pagination">
+                                    <?php if ($page > 1): ?>
+                                        <a href="?page=<?php echo $page - 1; ?>">Previous</a>
+                                    <?php endif; ?>
+                                    
+                                    <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                                        <a href="?page=<?php echo $i; ?>" <?php if ($i == $page) echo 'class="active"'; ?>><?php echo $i; ?></a>
+                                    <?php endfor; ?>
+                                    
+                                    <?php if ($page < $totalPages): ?>
+                                        <a href="?page=<?php echo $page + 1; ?>">Next</a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
